@@ -163,8 +163,16 @@ int fs_format() {
 }
 
 int fs_free() {
-  printf("Função não implementada: fs_free\n");
-  return 0;
+    int livres = 0;
+    int i;
+
+    for(i = 33; i < 65536; i++)
+    {
+        if(fat[i] == LIVRE)
+            livres++;
+    }
+
+    return livres * CLUSTERSIZE;
 }
 
 int fs_list(char *buffer, int size) {
@@ -173,8 +181,57 @@ int fs_list(char *buffer, int size) {
 }
 
 int fs_create(char* file_name) {
-  printf("Função não implementada: fs_create\n");
-  return 0;
+    int i, j; 
+    int fat_livre = FALSO, dir_livre = FALSO;
+    
+    for(j = 0; j < 128; j++)
+    {
+        if(strcmp(dir[j].name, file_name) == 0)
+        {
+            printf("Arquivo com mesmo nome já existe.\n");
+            return 0;
+        }
+    }
+
+    // Faz varredura na FAT em busca de uma posicao marcada como LIVRE
+    for(i = 33; i < 65536; i++)
+    {
+        if(fat[i] == LIVRE)
+        {
+            fat_livre = VERDADEIRO;
+            break;
+        }
+    }
+    
+    if(fat_livre)
+    {
+        for(j = 0; j < 128; j++)
+        {
+            if(dir[j].used == FALSO)
+            {
+                dir_livre = VERDADEIRO;
+                // Atualiza a FAT
+                fat[i] = ULTIMO;
+
+                // Atualiza a entrada no vetor de arquivos
+                dir[j].used = VERDADEIRO;
+                dir[j].first_block = i;
+                dir[j].size = 0;
+                strcpy(dir[j].name, file_name);
+
+                return 1;
+            }   
+        }
+
+        if(!dir_livre)
+            printf("Disco cheio!");
+    }
+    else
+    {
+        printf("Disco cheio!");
+    }
+    
+    return 0;
 }
 
 int fs_remove(char *file_name) {
