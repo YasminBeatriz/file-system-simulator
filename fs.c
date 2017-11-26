@@ -41,13 +41,125 @@ dir_entry dir[128];
 
 
 int fs_init() {
-  printf("Função não implementada: fs_init\n");
-  return 1;
+    int sector, agrupamento, buffer_offset;
+    char *buffer = (char *) malloc (sizeof(fat));
+    int isFAT = VERDADEIRO, isDir = VERDADEIRO;
+    int i;
+  
+    //Le a tabela FAT e o diretorio do disco em um buffer
+    buffer_offset = 0;
+    for(agrupamento = 0; agrupamento < 33; agrupamento++)
+    {
+        sector = 0;
+        while(sector < 8)
+        {
+            bl_read(agrupamento * 8 + sector, &buffer[buffer_offset]);
+            sector++;
+            buffer_offset = buffer_offset + 512;
+        }
+    }
+
+    //Vê se as 32 posicoes da tabela FAT referenciada pelo buffer tem o codigo FAT  
+    buffer_offset = 0;
+    for(agrupamento = 0; agrupamento < 32; agrupamento++)
+    {
+        if(buffer[buffer_offset] != FAT)
+        {
+            isFAT = FALSO;
+            break;
+        }
+        else
+            buffer_offset = buffer_offset + 2;
+    }
+
+    //Vê se a 33a posicao da tabela FAT referenciada pelo buffer tem o codigo DIRETORIO
+    if(buffer[buffer_offset] != DIRETORIO)
+    {
+        isDir = FALSO;
+    }
+
+    if(!isFAT || !isDir)
+    {
+        fs_format();
+    }
+    else
+    {
+        // Carrega a tabela FAT e o diretorio
+
+        // FAT já está em buffer
+        buffer_offset = 0;
+        for(i = 0; i < 65536; i++)
+        {
+            fat[i] = buffer[buffer_offset];
+            buffer_offset = buffer_offset + 2;
+        }
+
+        // buffer pega o diretorio que está no disco no agrupamento 33
+        buffer = (char *) malloc (sizeof(dir));
+        buffer_offset = 0;
+        sector = 0;
+        while(sector < 8)
+        {
+            bl_read(32 * 8 + sector, &buffer[buffer_offset]);
+            sector++;
+        }
+    
+        // copia buffer para o vetor de diretorios
+        memcpy(&dir, buffer, 128);
+    }
+
+    return 1;
 }
 
 int fs_format() {
-  printf("Função não implementada: fs_format\n");
-  return 0;
+    int i, sector, agrupamento, buffer_offset;
+    char *buffer;
+
+    //inicializa a tabela FAT
+    for(i = 0; i < 32; i++)
+        fat[i] = FAT;
+    
+    for(i = 32; i < 33; i++)
+        fat[i] = DIRETORIO;
+
+    for(i = 33; i < 65536; i++)
+        fat[i] = LIVRE;
+
+    // Escreve a FAT no disco
+    buffer = (char *) fat;
+    buffer_offset = 0;
+
+    for(agrupamento = 0; agrupamento < 32; agrupamento++)
+    {
+        sector = 0;
+        while(sector < 8)
+        {
+            bl_write(agrupamento * 8 + sector, &buffer[buffer_offset]);
+            sector++;
+            buffer_offset = buffer_offset + 512;
+        }
+    }
+
+    //Zera o diretorio
+    for(i = 0; i < 128; i++)
+    {
+        dir[i].used = FALSO;
+    }
+
+    //Escreve o diretorio no disco
+    buffer = (char *) dir;
+    buffer_offset = 0;
+    agrupamento = 32;
+    sector = 0;
+
+    while(sector < 8)
+    {
+        bl_write(agrupamento * 8 + sector, &buffer[buffer_offset]);
+        sector++;
+        buffer_offset = buffer_offset + 512;
+    }
+    
+    return 1;
 }
 
 int fs_free() {
